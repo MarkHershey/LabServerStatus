@@ -46,6 +46,7 @@ printf ">>> \xE2\x9C\x94 OK \n"
 
 
 # Create the runner script
+printf "\n>>> Create the runner script ./run_system_status_client \n"
 echo "#!/usr/bin/env bash" > $runner_script_path
 echo "" >> $runner_script_path
 echo "cd $(realpath .)" >> $runner_script_path
@@ -54,10 +55,15 @@ echo "$(which python3) client/main.py --interval 5 --name 'Default'" >> $runner_
 # '2080Ti x4 Workstation'
 # '2080Ti x1 Workstation'
 # '3090 x3 Workstation'
+printf ">>> \xE2\x9C\x94 OK \n"
 
 
 # Make it executable
+printf "\n>>> Make the runner script executable \n"
 chmod a+x $runner_script_path
+printf ">>> \xE2\x9C\x94 OK \n"
 
 # Copy the runner script to /bin
+printf "\n>>> Copy the runner script to /bin\n"
 sudo cp -i -v $runner_script_path /bin
+printf ">>> \xE2\x9C\x94 OK \n"
