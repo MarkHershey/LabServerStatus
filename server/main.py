@@ -2,6 +2,7 @@ import os
 import sys
 from datetime import datetime
 from logging import INFO
+from typing import List
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -50,7 +51,7 @@ DATA_CACHE = {
 
 class ServerStatus(BaseModel):
     created_at: datetime = None
-    name: datetime = None
+    name: str = None
     # ip
     hostname: str = None
     local_ip: str = None
@@ -68,7 +69,7 @@ class ServerStatus(BaseModel):
     ram_installed: str = None
     ram_usage: str = None
     # gpu usage
-    gpu_status: dict = None
+    gpu_status: List[dict] = None
 
     @validator("created_at", pre=True, always=True)
     def default_created_at(cls, v):
