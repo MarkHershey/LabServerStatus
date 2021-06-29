@@ -86,6 +86,11 @@ async def read_root():
     return {"Hello": "World"}
 
 
+@app.get("/get")
+async def get_status():
+    return DATA_CACHE
+
+
 @app.post("/post", status_code=201)
 async def post_status(status: ServerStatus):
     global DATA_CACHE
@@ -95,8 +100,3 @@ async def post_status(status: ServerStatus):
         return {"msg": "OK"}
     else:
         raise HTTPException(status_code=401)
-
-
-@app.post("/get")
-async def get_status():
-    return DATA_CACHE
