@@ -1,0 +1,63 @@
+#!/usr/bin/env bash
+
+# name of the runner script to be created (at cwd)
+runner_script_path="run_system_status_client"
+
+# check python version
+printf "\n>>> Checking Python version... \n"
+version=$(python -V)
+if [[ "$version" == "Python 3."* ]]; then
+    printf ">>> \xE2\x9C\x94 $version \n"
+    use_python=true
+else
+    version=$(python3 -V)
+    if [[ "$version" == "Python 3."* ]]; then
+        printf ">>> \xE2\x9C\x94 $version \n"
+    else
+        printf ">>> Error: Python 3.x not found."
+        printf ">>> Aborting... \n"
+        exit 1
+    fi
+fi
+
+# use python 3 create virtual environment
+if [ "$use_python" == true ]; then
+    printf "\n>>> python -m venv venv \n"
+    python -m venv venv || exit 1
+else
+    printf "\n>>> python3 -m venv venv \n"
+    python3 -m venv venv || exit 1
+fi
+printf ">>> \xE2\x9C\x94 OK \n"
+
+# activate the virtual environment
+source venv/bin/activate
+
+# update pip
+printf "\n>>> pip install --upgrade pip wheel setuptools \n"
+pip install --upgrade pip wheel setuptools
+printf ">>> \xE2\x9C\x94 OK \n"
+
+
+# install requirements
+printf "\n>>> pip install -r requirements.txt \n"
+pip install -r client/requirements.txt
+printf ">>> \xE2\x9C\x94 OK \n"
+
+
+# Create the runner script
+echo "#!/usr/bin/env bash" > $runner_script_path
+echo "" >> $runner_script_path
+echo "cd $(realpath .)" >> $runner_script_path
+echo "$(which python3) client/main.py --interval 5 --name 'Default'" >> $runner_script_path
+# You should replace above-line --name flag value with a unique name:
+# '2080Ti x4 Workstation'
+# '2080Ti x1 Workstation'
+# '3090 x3 Workstation'
+
+
+# Make it executable
+chmod a+x $runner_script_path
+
+# Copy the runner script to /bin
+sudo cp -i -v $runner_script_path /bin

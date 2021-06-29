@@ -1,3 +1,4 @@
+import argparse
 import csv
 import platform
 import re
@@ -19,11 +20,42 @@ from pydantic import BaseModel
 logger.setLevel(INFO)
 
 ###############################################################################
+## Get Argument Parser
+
+parser = argparse.ArgumentParser()
+parser.add_argument(
+    "-i",
+    "--interval",
+    dest="interval",
+    default=5,
+    help="Interval in number of seconds",
+)
+parser.add_argument(
+    "-n",
+    "--name",
+    dest="name",
+    default="Default",
+    help="Name of current machine",
+)
+args = parser.parse_args()
+
+###############################################################################
+## Constants
+
+SERVER = "server-stat.markhh.com"
+POST_URL = "https://" + SERVER + "/post"
+HEADERS = {"Content-type": "application/json", "Accept": "application/json"}
+
+# get value from parser
+INTERVAL = int(args.interval)
+MACHINE_NAME = str(args.name)
+
+###############################################################################
 ## Model
 
 
 class ServerStatus(BaseModel):
-    name: str = "REPLACE_ME"
+    name: str = MACHINE_NAME
     # ip
     hostname: str = None
     local_ip: str = None
@@ -206,32 +238,28 @@ def get_status() -> ServerStatus:
 
 
 ###############################################################################
-## Constants
-
-INTERVAL = 5  # seconds
-SERVER = "server-stat.markhh.com"
-
-###############################################################################
 ## Main
 
 
 def main():
 
     while True:
-
         sleep(INTERVAL)
-
         try:
             if not is_connected():
                 logger.warning("Not Connected to Internet.")
                 continue
 
             status: ServerStatus = get_status()
-            print(status)
             status = dict(status.dict())
 
-            # x = requests.post(SERVER, data=status)
-
+            r = requests.post(POST_URL, json=status, headers=HEADERS)
+            if r.status_code != 201:
+                logger.error(f"status_code: {r.status_code}")
+                print(r.text)
+                print(r)
+            else:
+                print("201 OK")
         except Exception as e:
             logger.exception(e)
 

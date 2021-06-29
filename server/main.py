@@ -40,6 +40,7 @@ print()
 
 
 DATA_CACHE = {
+    "Default": {},
     "2080Ti x4 Workstation": {},
     "2080Ti x1 Workstation": {},
     "3090 x3 Workstation": {},
