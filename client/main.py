@@ -10,7 +10,7 @@ from datetime import datetime
 from logging import INFO
 from pathlib import Path
 from time import sleep
-from typing import Dict, List
+from typing import Dict, List, Tuple
 
 import psutil
 import requests
@@ -60,6 +60,8 @@ class ServerStatus(BaseModel):
     hostname: str = None
     local_ip: str = None
     public_ip: str = None
+    ipv4s: List[Tuple[str, str]] = None
+    ipv6s: List[Tuple[str, str]] = None
     # sys info
     architecture: str = None
     mac_address: str = None
@@ -90,6 +92,12 @@ def is_connected() -> bool:
         pass
     return False
 
+def get_ip_addresses(family):
+    # Ref: https://stackoverflow.com/a/43478599
+    for interface, snics in psutil.net_if_addrs().items():
+        for snic in snics:
+            if snic.family == family:
+                yield (interface, snic.address)
 
 def get_ip() -> str:
     info = {}
@@ -97,6 +105,8 @@ def get_ip() -> str:
         hostname = socket.gethostname()
         info["hostname"] = hostname
         info["local_ip"] = socket.gethostbyname(hostname)
+        info["ipv4s"] = list(get_ip_addresses(socket.AF_INET))
+        info["ipv6s"] = list(get_ip_addresses(socket.AF_INET6))
         # https://www.ipify.org/
         public_ip = requests.get("https://api64.ipify.org").content.decode("utf-8")
         info["public_ip"] = public_ip
@@ -222,6 +232,8 @@ def get_status() -> ServerStatus:
     server_status_info.hostname = ip.get("hostname", "")
     server_status_info.local_ip = ip.get("local_ip", "")
     server_status_info.public_ip = ip.get("public_ip", "")
+    server_status_info.ipv4s = ip.get("ipv4s", [])
+    server_status_info.ipv6s = ip.get("ipv6s", [])
     server_status_info.architecture = sys_info.get("architecture", "")
     server_status_info.mac_address = sys_info.get("mac_address", "")
     server_status_info.platform = sys_info.get("platform", "")

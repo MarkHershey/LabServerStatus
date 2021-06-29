@@ -2,7 +2,7 @@ import os
 import sys
 from datetime import datetime
 from logging import INFO
-from typing import List
+from typing import List, Tuple
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -57,6 +57,8 @@ class ServerStatus(BaseModel):
     hostname: str = None
     local_ip: str = None
     public_ip: str = None
+    ipv4s: List[Tuple[str, str]] = None
+    ipv6s: List[Tuple[str, str]] = None
     # sys info
     architecture: str = None
     mac_address: str = None
