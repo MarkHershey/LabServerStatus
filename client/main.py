@@ -50,6 +50,8 @@ HEADERS = {"Content-type": "application/json", "Accept": "application/json"}
 INTERVAL = int(args.interval)
 MACHINE_NAME = str(args.name)
 
+PUBLIC_IP: str = ""
+
 ###############################################################################
 ## Model
 
@@ -107,14 +109,23 @@ def get_ip() -> str:
         info["local_ip"] = socket.gethostbyname(hostname)
         info["ipv4s"] = list(get_ip_addresses(socket.AF_INET))
         info["ipv6s"] = list(get_ip_addresses(socket.AF_INET6))
-        # https://www.ipify.org/
-        public_ip = requests.get("https://api64.ipify.org").content.decode("utf-8")
-        info["public_ip"] = public_ip
+        info["public_ip"] = get_public_ip()
     except Exception as e:
         logger.error(e)
         info["error"] = str(e)
     return info
 
+
+def get_public_ip() -> str:
+    global PUBLIC_IP
+    if not PUBLIC_IP:
+        try: 
+            # https://www.ipify.org/
+            PUBLIC_IP = requests.get("https://api64.ipify.org").content.decode("utf-8")
+        except Exception as e:
+            logger.error(e)
+    
+    return PUBLIC_IP
 
 def get_temp_status():
     # linux only
