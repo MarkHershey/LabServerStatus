@@ -77,7 +77,9 @@ class ServerStatus(BaseModel):
     ram_installed: str = None
     ram_usage: str = None
     # gpu usage
-    gpu_status: dict = None
+    gpu_status: List[dict] = None
+    # users info
+    users_info: Dict[str, List[str]] = None
 
 
 ###############################################################################
@@ -94,12 +96,14 @@ def is_connected() -> bool:
         pass
     return False
 
+
 def get_ip_addresses(family):
     # Ref: https://stackoverflow.com/a/43478599
     for interface, snics in psutil.net_if_addrs().items():
         for snic in snics:
             if snic.family == family:
                 yield (interface, snic.address)
+
 
 def get_ip() -> str:
     info = {}
@@ -119,13 +123,14 @@ def get_ip() -> str:
 def get_public_ip() -> str:
     global PUBLIC_IP
     if not PUBLIC_IP:
-        try: 
+        try:
             # https://www.ipify.org/
             PUBLIC_IP = requests.get("https://api64.ipify.org").content.decode("utf-8")
         except Exception as e:
             logger.error(e)
-    
+
     return PUBLIC_IP
+
 
 def get_temp_status():
     # linux only
@@ -177,6 +182,79 @@ def get_sys_usage() -> Dict[str, str]:
         logger.error(e)
         info["error"] = str(e)
     return info
+
+
+def get_online_users() -> List[str]:
+    tmp_file = Path("tmp_users_output.txt")
+
+    cmd = "users"
+    with tmp_file.open(mode="w") as tmp_out:
+        subprocess.run(
+            shlex.split(cmd),
+            stdout=tmp_out,
+        )
+        tmp_out.close()
+
+    sleep(0.2)
+    online_users: List[str] = []
+
+    with tmp_file.open(mode="r") as f:
+        content = f.readline()
+        f.close()
+
+    online_users = list(set(str(content).strip().split()))
+    return online_users
+
+
+def get_all_users() -> List[str]:
+    passwd_file = Path("/etc/passwd")
+    all_users: List[str] = []
+
+    with passwd_file.open(mode="r") as f:
+        lines = f.readlines()
+        f.close()
+
+    for line in lines:
+        line = str(line).strip()
+        if line:
+            """
+            Ref: https://askubuntu.com/a/725122
+
+            /etc/passwd contains one line for each user account, with seven fields
+            delimited by colons (“:”). These fields are:
+
+            0 - login name
+            1 - optional encrypted password
+            2 - numerical user ID
+            3 - numerical group ID
+            4 - user name or comment field
+            5 - user home directory
+            6 - optional user command interpreter
+            """
+            user_data = line.split(":")
+            username = user_data[0]
+            user_id = user_data[2]
+            if 1000 <= int(user_id) <= 60000:
+                all_users.append(username)
+
+    all_users = list(set(all_users))
+    return all_users
+
+
+def get_users_info() -> Dict[str, List[str]]:
+    online_users = get_online_users()
+    all_users = get_all_users()
+    offline_users = all_users[:]
+    for u in online_users:
+        if u in offline_users:
+            offline_users.remove(u)
+
+    users = {
+        "all_users": all_users,
+        "online_users": online_users,
+        "offline_users": offline_users,
+    }
+    return users
 
 
 def get_gpu_status() -> List[Dict[str, str]]:
@@ -234,7 +312,6 @@ def get_status() -> ServerStatus:
     ip = get_ip()
     sys_info = get_sys_info()
     sys_usage = get_sys_usage()
-    gpu_status = get_gpu_status()
     timestamp = datetime.now()
     logger.debug(f"Now: {timestamp}")
 
@@ -255,7 +332,8 @@ def get_status() -> ServerStatus:
     server_status_info.ram_available = sys_usage.get("ram_available", "")
     server_status_info.ram_installed = sys_usage.get("ram_installed", "")
     server_status_info.ram_usage = sys_usage.get("ram_usage", "")
-    server_status_info.gpu_status = gpu_status
+    server_status_info.gpu_status = get_gpu_status()
+    server_status_info.users_info = get_users_info()
 
     return server_status_info
 

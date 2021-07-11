@@ -2,7 +2,7 @@ import os
 import sys
 from datetime import datetime
 from logging import INFO
-from typing import List, Tuple
+from typing import Dict, List, Tuple
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -73,6 +73,8 @@ class ServerStatus(BaseModel):
     ram_usage: str = None
     # gpu usage
     gpu_status: List[dict] = None
+    # users info
+    users_info: Dict[str, List[str]] = None
 
     @validator("created_at", pre=True, always=True)
     def default_created_at(cls, v):
