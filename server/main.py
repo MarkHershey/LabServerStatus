@@ -39,11 +39,16 @@ logger.info(f"Python Version  : {sys.version}")
 print()
 
 
+# Client whitelist
 DATA_CACHE = {
     "Default": {},
     "2080Ti x4 Workstation": {},
     "2080Ti x1 Workstation": {},
     "3090 x3 Workstation": {},
+    "Workstation#1 Alan": {},
+    "Workstation#2 Maurice": {},
+    "Workstation#3 Richard": {},
+    "Workstation#4 Marvin": {},
 }
 
 ###############################################################################
