@@ -1,4 +1,4 @@
 requests
 pydantic
 psutil>=5.8.0
-puts>=0.0.3
+puts>=0.0.6

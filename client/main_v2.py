@@ -15,9 +15,10 @@ from typing import Dict, List, Tuple
 
 import psutil
 import requests
-from puts.logger import logger
+from puts import get_logger
 from pydantic import BaseModel, validator
 
+logger = get_logger()
 logger.setLevel(INFO)
 
 ###############################################################################
@@ -299,6 +300,7 @@ def get_gpu_status() -> List[GPUStatus]:
     cmd = "nvidia-smi --query-gpu=index,gpu_name,utilization.gpu,temperature.gpu,memory.total,memory.used,memory.free --format=csv"
 
     with tmp_file.open(mode="w") as tmp_out:
+        # TODO: hadle none-zero exit code
         subprocess.run(
             shlex.split(cmd),
             stdout=tmp_out,
