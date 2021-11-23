@@ -6,9 +6,10 @@ from typing import Dict, List, Tuple
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from puts.logger import logger
+from puts import get_logger
 from pydantic import BaseModel, validator
 
+logger = get_logger()
 logger.setLevel(INFO)
 
 ###############################################################################
@@ -52,6 +53,31 @@ DATA_CACHE = {
 }
 
 ###############################################################################
+## Helpers
+
+
+def mask_sensitive_string(value: str) -> str:
+    """
+    Mask sensitive string
+    """
+    if value is None:
+        return None
+
+    assert isinstance(value, str)
+
+    if len(value) == 0:
+        return ""
+    elif len(value) == 1:
+        return "*"
+    elif len(value) == 2:
+        return value[0] + "*"
+    elif len(value) <= 4:
+        return value[0] + "*" * (len(value) - 2) + value[-1]
+    else:
+        return value[0:2] + "*" * (len(value) - 3) + value[-1]
+
+
+###############################################################################
 ## Model
 
 
@@ -62,8 +88,8 @@ class ServerStatus(BaseModel):
     hostname: str = None
     local_ip: str = None
     public_ip: str = None
-    ipv4s: List[Tuple[str, str]] = None
-    ipv6s: List[Tuple[str, str]] = None
+    ipv4s: list = None
+    ipv6s: list = None
     # sys info
     architecture: str = None
     mac_address: str = None
@@ -79,11 +105,20 @@ class ServerStatus(BaseModel):
     # gpu usage
     gpu_status: List[dict] = None
     # users info
-    users_info: Dict[str, List[str]] = None
+    users_info: dict = None
 
     @validator("created_at", pre=True, always=True)
     def default_created_at(cls, v):
         return v or datetime.now()
+
+    @validator("users_info", pre=True, always=True)
+    def process_users_info(cls, v):
+        if isinstance(v, dict):
+            for keys in v.keys():
+                v[keys] = [mask_sensitive_string(user) for user in v[keys]]
+            return v
+        else:
+            return v
 
 
 ###############################################################################
