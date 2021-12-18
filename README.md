@@ -2,7 +2,7 @@
 
 ## 3 Roles in the Architecture
 
--   **Client**: The Client is installed on the Lab Workstation you would like to monitor. It is responsible for reporting its own status to the central Server.
+-   **Self-Reporting Client**: The Client is installed on the Lab Workstation you would like to monitor. It is responsible for reporting its own status to the central Server.
 -   **Server**: The Server is responsible for receiving the status reports from the Clients and managing the overall status of the Lab. It must be installed before the Clients and has a fixed IP address.
 -   **ViewerClient (Web)**: The ViewerClient is responsible for displaying the status of the Lab to the user. It retrieves data from the Server via HTTP GET requests.
 

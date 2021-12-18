@@ -1,5 +1,6 @@
 tmp_*.txt
 run_system_status_client
+.vscode
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
