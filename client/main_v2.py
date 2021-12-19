@@ -15,8 +15,10 @@ from typing import Dict, List, Tuple
 
 import psutil
 import requests
-from puts import get_logger
+from puts import get_logger, json_serial
 from pydantic import BaseModel, validator
+
+from data_model import MachineStatus, GPUStatus
 
 logger = get_logger()
 logger.setLevel(INFO)
@@ -39,64 +41,27 @@ parser.add_argument(
     default="Default",
     help="Name of current machine",
 )
+parser.add_argument(
+    "-s",
+    "--server",
+    dest="server",
+    default="http://127.0.0.1:8000",
+    help="Server address",
+)
+
 args = parser.parse_args()
 
 # get value from parser
 INTERVAL = int(args.interval)
 MACHINE_NAME = str(args.name)
+SERVER = str(args.server)
 
 ###############################################################################
 ## Constants
 
-SERVER = "server-stat.markhh.com"
-POST_URL = "https://" + SERVER + "/post"
+POST_URL = SERVER + "/post"
 HEADERS = {"Content-type": "application/json", "Accept": "application/json"}
-
 PUBLIC_IP: str = ""
-
-###############################################################################
-## Model
-
-
-class GPUStatus(BaseModel):
-    index: int = None
-    gpu_name: str = None
-    gpu_usage: float = None  # range: [0, 1]
-    temperature: float = None  # Celsius
-    memory_free: float = None  # MB
-    memory_total: float = None  # MB
-    memory_usage: float = None  # range: [0, 1]
-
-
-class MachineStatus(BaseModel):
-    created_at: datetime = None
-    name: str = None
-    # ip
-    hostname: str = None
-    local_ip: str = None
-    public_ip: str = None
-    ipv4s: List[Tuple[str, str]] = None
-    ipv6s: List[Tuple[str, str]] = None
-    # sys info
-    architecture: str = None
-    mac_address: str = None
-    platform: str = None
-    platform_release: str = None
-    platform_version: str = None
-    processor: str = None
-    # sys usage
-    cpu_usage: float = None  # range: [0, 1]
-    ram_free: float = None  # MB
-    ram_total: float = None  # MB
-    ram_usage: float = None  # range: [0, 1]
-    # gpu usage
-    gpu_status: List[GPUStatus] = None
-    # users info
-    users_info: Dict[str, List[str]] = None
-
-    @validator("created_at", pre=True, always=True)
-    def default_created_at(cls, v):
-        return v or datetime.now()
 
 
 ###############################################################################
@@ -383,21 +348,16 @@ def get_status() -> MachineStatus:
 ## Main
 
 
-def json_serial(obj):
-    """JSON serializer for objects not serializable by default json code"""
-
-    if isinstance(obj, (datetime, date)):
-        return obj.isoformat()
-    raise TypeError("Type %s not serializable" % type(obj))
-
-
 def main():
+    retry = 0
 
     while True:
         sleep(INTERVAL)
+        sleep(retry)
         try:
             if not is_connected():
                 logger.warning("Not Connected to Internet.")
+                retry += 5
                 continue
 
             status: MachineStatus = get_status()
@@ -411,8 +371,10 @@ def main():
                 print(r)
             else:
                 print("201 OK")
+                retry = 0
         except Exception as e:
-            logger.exception(e)
+            logger.error(e)
+            retry += 5
 
 
 if __name__ == "__main__":
