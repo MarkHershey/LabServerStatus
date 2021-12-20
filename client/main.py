@@ -15,10 +15,9 @@ from typing import Dict, List, Tuple
 
 import psutil
 import requests
+from data_model import GPUStatus, MachineStatus
 from puts import get_logger, json_serial
 from pydantic import BaseModel, validator
-
-from data_model import MachineStatus, GPUStatus
 
 logger = get_logger()
 logger.setLevel(INFO)
@@ -168,7 +167,7 @@ def get_sys_usage() -> Dict[str, float]:
         mem = psutil.virtual_memory()
         info["ram_total"] = mem.total / (1024.0 ** 2)  # MiB
         info["ram_free"] = mem.available / (1024.0 ** 2)  # MiB
-        info["ram_usage"] = mem.percent / 100  # 0 ~ 1
+        info["ram_usage"] = round(mem.percent / 100, 5)  # 0 ~ 1
     except Exception as e:
         logger.error(e)
         info["error"] = str(e)
@@ -296,7 +295,7 @@ def get_gpu_status() -> List[GPUStatus]:
                     gpu_status.memory_free = float(value.strip(" MiB"))
             # compute used memory percentage
             # value returned by utilization.memory is not accurate
-            gpu_status.memory_usage = gpu_mem_used / gpu_status.memory_total
+            gpu_status.memory_usage = round(gpu_mem_used / gpu_status.memory_total, 5)
             gpu_status_list.append(gpu_status)
         # close file
         csvfile.close()

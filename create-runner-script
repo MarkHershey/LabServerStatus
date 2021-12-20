@@ -50,11 +50,7 @@ printf "\n>>> Create the runner script ./run_system_status_client \n"
 echo "#!/usr/bin/env bash" > $runner_script_path
 echo "" >> $runner_script_path
 echo "cd $(realpath .)" >> $runner_script_path
-echo "$(which python3) client/main.py --interval 5 --name 'Default'" >> $runner_script_path
-# You should replace above-line --name flag value with a unique name:
-# '2080Ti x4 Workstation'
-# '2080Ti x1 Workstation'
-# '3090 x3 Workstation'
+echo "$(which python3) client/main.py --interval 5 --name 'Default' --server 'https://server-stat.markhh.com'" >> $runner_script_path
 printf ">>> \xE2\x9C\x94 OK \n"
 
 

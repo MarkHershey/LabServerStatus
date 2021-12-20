@@ -1,0 +1,4 @@
+pydantic
+fastapi 
+uvicorn 
+puts==0.0.7

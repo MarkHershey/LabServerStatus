@@ -8,5 +8,5 @@ printf ">>> OK \n"
 
 # install project dependencies
 printf "\n>>> pip install project dependencies...\n"
-pip install --upgrade puts pydantic fastapi uvicorn 
+pip install --upgrade puts==0.0.7 pydantic fastapi uvicorn 
 printf ">>> OK \n"

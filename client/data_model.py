@@ -3,7 +3,6 @@ from typing import Dict, List, Tuple
 
 from pydantic import BaseModel, validator
 
-
 # class ServerStatus(BaseModel):
 #     """v1"""
 
