@@ -57,6 +57,20 @@ class GPUStatus(BaseModel):
     memory_usage: float = None  # range: [0, 1]
 
 
+class GPUComputeProcess(BaseModel):
+    pid: int = None
+    user: str = None
+    gpu_uuid: str = None
+    gpu_index: int = None
+    gpu_mem_used: float = None  # MB
+    gpu_mem_usage: float = None  # range: [0, 1]
+    cpu_usage: float = None  # range: [0, 1]
+    cpu_mem_usage: float = None  # range: [0, 1]
+    proc_uptime: float = None  # seconds
+    proc_uptime_str: str = None  # HH:MM:SS
+    command: str = None
+
+
 class MachineStatus(BaseModel):
     created_at: datetime = None
     name: str = None
@@ -82,6 +96,7 @@ class MachineStatus(BaseModel):
     ram_usage: float = None  # range: [0, 1]
     # gpu usage
     gpu_status: List[GPUStatus] = None
+    gpu_compute_processes: List[GPUComputeProcess] = None
     # users info
     users_info: Dict[str, List[str]] = None
 

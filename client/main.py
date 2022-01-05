@@ -1,10 +1,12 @@
 import argparse
+import datetime
 import json
 import platform
 import re
 import shlex
 import socket
 import subprocess
+import time
 import uuid
 from logging import INFO
 from pathlib import Path
@@ -13,7 +15,7 @@ from typing import Dict, List, Tuple
 
 import psutil
 import requests
-from data_model import GPUStatus, MachineStatus
+from data_model import GPUComputeProcess, GPUStatus, MachineStatus
 from puts import get_logger, json_serial
 
 logger = get_logger()
@@ -185,6 +187,37 @@ def get_sys_info() -> Dict[str, str]:
 
 
 ###############################################################################
+## Processes
+
+
+def _get_proc_info(pid: int) -> dict:
+    try:
+        proc = psutil.Process(pid)
+        user = proc.username()
+        cpu_usage = round(proc.cpu_percent() / 100, 5)  # 0 ~ 1
+        cpu_mem_usage = round(proc.memory_percent() / 100, 5)  # 0 ~ 1
+        _create_time = proc.create_time()
+        _time_now = time.time()
+        proc_uptime: float = _time_now - _create_time  # seconds
+        proc_uptime_str = str(datetime.timedelta(seconds=int(proc_uptime)))
+        command = " ".join(proc.cmdline())
+
+        return dict(
+            pid=pid,
+            user=user,
+            cpu_usage=cpu_usage,
+            cpu_mem_usage=cpu_mem_usage,
+            proc_uptime=proc_uptime,
+            proc_uptime_str=proc_uptime_str,
+            command=command,
+        )
+    except Exception as e:
+        logger.error(e)
+
+    return None
+
+
+###############################################################################
 ## CPU & RAM
 
 
@@ -317,8 +350,73 @@ def get_gpu_status() -> List[GPUStatus]:
     return gpu_status_list
 
 
-def get_gpu_processes():
-    ...
+def _get_gpu_uuid_index_map():
+    """
+    Get GPU uuid to index map
+    """
+
+    cmd = "nvidia-smi --query-gpu=index,uuid --format=csv"
+    completed_proc = subprocess.run(
+        shlex.split(cmd),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+    )
+    if completed_proc.returncode != 0:
+        return {}
+
+    output = completed_proc.stdout.decode("utf-8").strip()
+    gpu_uuid_index_map: Dict[str, int] = {}
+    lines = output.split("\n")
+    if len(lines) <= 1:
+        return {}
+    for row in lines[1:]:
+        row = row.split(",")
+        if len(row) != 2:
+            continue
+        gpu_uuid_index_map[row[1].strip()] = int(row[0].strip())
+
+    return gpu_uuid_index_map
+
+
+def get_gpu_compute_processes() -> List[GPUComputeProcess]:
+    cmd = "nvidia-smi --query-compute-apps=pid,gpu_uuid,used_gpu_memory --format=csv"
+    completed_proc = subprocess.run(
+        shlex.split(cmd),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+    )
+    if completed_proc.returncode != 0:
+        return []
+
+    output = completed_proc.stdout.decode("utf-8").strip()
+    gpu_compute_processes: List[GPUComputeProcess] = []
+    lines = output.split("\n")
+    if len(lines) <= 1:
+        return []
+
+    gpu_uuid_index_map = _get_gpu_uuid_index_map()
+
+    for row in lines[1:]:
+        row = row.split(",")
+        if len(row) != 3:
+            continue
+        gpu_proc = GPUComputeProcess()
+        gpu_proc.pid = int(row[0].strip())
+        gpu_proc.gpu_uuid = row[1].strip()
+        gpu_proc.gpu_index = gpu_uuid_index_map.get(gpu_proc.gpu_uuid, -1)
+        gpu_proc.gpu_mem_used = float(row[2].strip(" MiB"))
+        # get more details of the process from ps
+        proc_info: dict = _get_proc_info(gpu_proc.pid)
+        gpu_proc.user = proc_info.get("user", "")
+        gpu_proc.cpu_usage = proc_info.get("cpu_usage", "")
+        gpu_proc.cpu_mem_usage = proc_info.get("cpu_mem_usage", "")
+        gpu_proc.proc_uptime = proc_info.get("proc_uptime", 0)
+        gpu_proc.proc_uptime_str = proc_info.get("proc_uptime_str", "")
+        gpu_proc.command = proc_info.get("command", "")
+
+        gpu_compute_processes.append(gpu_proc)
+
+    return gpu_compute_processes
 
 
 ###############################################################################
@@ -357,6 +455,7 @@ def get_status() -> MachineStatus:
     status.ram_usage = sys_usage.get("ram_usage", "")
     # GPU
     status.gpu_status = get_gpu_status()
+    status.gpu_compute_processes = get_gpu_compute_processes()
     # USER
     status.users_info = get_users_info()
 
