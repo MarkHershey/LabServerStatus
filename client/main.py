@@ -142,7 +142,7 @@ def get_fans_status():
 ## System
 
 
-def get_sys_uptime() -> Tuple[float, str]:
+def _get_sys_uptime() -> Tuple[float, str]:
     cmd = "cat /proc/uptime"
     completed_proc = subprocess.run(
         shlex.split(cmd),
@@ -168,18 +168,54 @@ def get_sys_uptime() -> Tuple[float, str]:
     return uptime, uptime_str
 
 
+def _get_cpu_model() -> str:
+    cmd = "awk -F: '/model name/ {name=$2} END {print name}' /proc/cpuinfo"
+    completed_proc = subprocess.run(
+        shlex.split(cmd),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+    )
+    if completed_proc.returncode != 0:
+        return "NA"
+
+    output = completed_proc.stdout.decode("utf-8").strip()
+    return output
+
+
+def _get_cpu_cores() -> int:
+    cmd = "awk -F: '/model name/ {core++} END {print core}' /proc/cpuinfo"
+    completed_proc = subprocess.run(
+        shlex.split(cmd),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+    )
+    if completed_proc.returncode != 0:
+        return 0
+
+    output = completed_proc.stdout.decode("utf-8").strip()
+    return int(output)
+
+
+def _get_mac_address() -> str:
+    return ":".join(re.findall("..", "%012x" % uuid.getnode()))
+
+
 def get_sys_info() -> Dict[str, str]:
     info = {}
     try:
-        info["platform"] = platform.system()
-        info["platform_release"] = platform.release()
-        info["platform_version"] = platform.version()
-        info["architecture"] = platform.machine()
-        info["mac_address"] = ":".join(re.findall("..", "%012x" % uuid.getnode()))
-        info["processor"] = platform.processor()
-        uptime, uptime_str = get_sys_uptime()
-        info["uptime"] = uptime
-        info["uptime_str"] = uptime_str
+        uptime, uptime_str = _get_sys_uptime()
+        info = dict(
+            uptime=uptime,
+            uptime_str=uptime_str,
+            platform=platform.system(),
+            platform_release=platform.release(),
+            platform_version=platform.version(),
+            architecture=platform.machine(),
+            processor=platform.processor(),
+            mac_address=_get_mac_address(),
+            cpu_model=_get_cpu_model(),
+            cpu_cores=_get_cpu_cores(),
+        )
     except Exception as e:
         logger.error(e)
         info["error"] = str(e)
@@ -448,6 +484,8 @@ def get_status() -> MachineStatus:
     status.uptime = sys_info.get("uptime", 0)
     status.uptime_str = sys_info.get("uptime_str", "")
     # CPU
+    status.cpu_model = sys_info.get("cpu_model", "")
+    status.cpu_cores = sys_info.get("cpu_cores", 0)
     status.cpu_usage = sys_usage.get("cpu_usage", "")
     # RAM
     status.ram_free = sys_usage.get("ram_free", "")

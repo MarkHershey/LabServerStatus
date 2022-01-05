@@ -90,6 +90,8 @@ class MachineStatus(BaseModel):
     uptime: float = None  # seconds
     uptime_str: str = None
     # sys usage
+    cpu_model: str = None
+    cpu_cores: int = None
     cpu_usage: float = None  # range: [0, 1]
     ram_free: float = None  # MB
     ram_total: float = None  # MB
