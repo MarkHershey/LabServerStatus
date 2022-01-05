@@ -62,6 +62,8 @@ class MachineStatus(BaseModel):
     platform_release: str = None
     platform_version: str = None
     processor: str = None
+    uptime: float = None  # seconds
+    uptime_str: str = None
     # sys usage
     cpu_usage: float = None  # range: [0, 1]
     ram_free: float = None  # MB

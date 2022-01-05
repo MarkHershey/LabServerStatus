@@ -140,6 +140,32 @@ def get_fans_status():
 ## System
 
 
+def get_sys_uptime() -> Tuple[float, str]:
+    cmd = "cat /proc/uptime"
+    completed_proc = subprocess.run(
+        shlex.split(cmd),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+    )
+    if completed_proc.returncode != 0:
+        return 0, "NA"
+
+    output = completed_proc.stdout.decode("utf-8").strip()
+    uptime = float(output.split()[0])
+    days = int(uptime // 86400)
+    hours = int((uptime % 86400) // 3600)
+    minutes = int((uptime % 3600) // 60)
+
+    if days > 0:
+        uptime_str = f"{days}d {hours}h {minutes}m"
+    elif hours > 0:
+        uptime_str = f"{hours}h {minutes}m"
+    else:
+        uptime_str = f"{minutes}m"
+
+    return uptime, uptime_str
+
+
 def get_sys_info() -> Dict[str, str]:
     info = {}
     try:
@@ -149,6 +175,9 @@ def get_sys_info() -> Dict[str, str]:
         info["architecture"] = platform.machine()
         info["mac_address"] = ":".join(re.findall("..", "%012x" % uuid.getnode()))
         info["processor"] = platform.processor()
+        uptime, uptime_str = get_sys_uptime()
+        info["uptime"] = uptime
+        info["uptime_str"] = uptime_str
     except Exception as e:
         logger.error(e)
         info["error"] = str(e)
@@ -288,6 +317,10 @@ def get_gpu_status() -> List[GPUStatus]:
     return gpu_status_list
 
 
+def get_gpu_processes():
+    ...
+
+
 ###############################################################################
 ## get status
 
@@ -314,6 +347,8 @@ def get_status() -> MachineStatus:
     status.platform_release = sys_info.get("platform_release", "")
     status.platform_version = sys_info.get("platform_version", "")
     status.processor = sys_info.get("processor", "")
+    status.uptime = sys_info.get("uptime", 0)
+    status.uptime_str = sys_info.get("uptime_str", "")
     # CPU
     status.cpu_usage = sys_usage.get("cpu_usage", "")
     # RAM
