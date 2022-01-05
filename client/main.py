@@ -1,5 +1,4 @@
 import argparse
-import csv
 import json
 import platform
 import re
@@ -7,7 +6,6 @@ import shlex
 import socket
 import subprocess
 import uuid
-from datetime import date, datetime
 from logging import INFO
 from pathlib import Path
 from time import sleep
@@ -17,7 +15,6 @@ import psutil
 import requests
 from data_model import GPUStatus, MachineStatus
 from puts import get_logger, json_serial
-from pydantic import BaseModel, validator
 
 logger = get_logger()
 logger.setLevel(INFO)
@@ -58,6 +55,8 @@ SERVER = str(args.server)
 ###############################################################################
 ## Constants
 
+if SERVER.endswith("/"):
+    SERVER = SERVER[:-1]
 POST_URL = SERVER + "/post"
 HEADERS = {"Content-type": "application/json", "Accept": "application/json"}
 PUBLIC_IP: str = ""
@@ -178,31 +177,26 @@ def get_sys_usage() -> Dict[str, float]:
 ## Users
 
 
-def get_online_users() -> List[str]:
-    tmp_file = Path("tmp_users_output.txt")
+def _get_online_users() -> List[str]:
+    completed_proc = subprocess.run(
+        "users",
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+    )
+    if completed_proc.returncode != 0:
+        return []
 
-    cmd = "users"
-    with tmp_file.open(mode="w") as tmp_out:
-        subprocess.run(
-            shlex.split(cmd),
-            stdout=tmp_out,
-        )
-        tmp_out.close()
-
-    sleep(0.2)
-    online_users: List[str] = []
-
-    with tmp_file.open(mode="r") as f:
-        content = f.readline()
-        f.close()
-
-    online_users = list(set(str(content).strip().split()))
+    output = completed_proc.stdout.decode("utf-8").strip()
+    online_users = list(set(output.split()))
     return online_users
 
 
-def get_all_users() -> List[str]:
+def _get_all_users() -> List[str]:
     passwd_file = Path("/etc/passwd")
     all_users: List[str] = []
+
+    if not passwd_file.exists():
+        return []
 
     with passwd_file.open(mode="r") as f:
         lines = f.readlines()
@@ -236,8 +230,8 @@ def get_all_users() -> List[str]:
 
 
 def get_users_info() -> Dict[str, List[str]]:
-    online_users = get_online_users()
-    all_users = get_all_users()
+    online_users = _get_online_users()
+    all_users = _get_all_users()
     offline_users = all_users[:]
     for u in online_users:
         if u in offline_users:
@@ -260,45 +254,36 @@ def get_gpu_status() -> List[GPUStatus]:
     Get GPU utilization info via nvidia-smi command call
     """
 
-    tmp_file = Path("tmp_nvidia-smi_output.txt")
     cmd = "nvidia-smi --query-gpu=index,gpu_name,utilization.gpu,temperature.gpu,memory.total,memory.used,memory.free --format=csv"
+    completed_proc = subprocess.run(
+        shlex.split(cmd),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+    )
+    if completed_proc.returncode != 0:
+        return []
 
-    with tmp_file.open(mode="w") as tmp_out:
-        # TODO: hadle none-zero exit code
-        subprocess.run(
-            shlex.split(cmd),
-            stdout=tmp_out,
-        )
-        tmp_out.close()
-
-    sleep(0.2)
+    output = completed_proc.stdout.decode("utf-8").strip()
     gpu_status_list: List[GPUStatus] = []
-
-    with open(str(tmp_file), newline="") as csvfile:
-        reader = csv.DictReader(csvfile, delimiter=",")
-        for row in reader:
-            gpu_status = GPUStatus()
-            for key, value in row.items():
-                if "index" in key:
-                    gpu_status.index = value.strip()
-                elif "name" in key:
-                    gpu_status.gpu_name = value.strip()
-                elif "utilization.gpu" in key:
-                    gpu_status.gpu_usage = float(value.strip("% ")) / 100
-                elif "temperature.gpu" in key:
-                    gpu_status.temperature = float(value.strip())
-                elif "memory.total" in key:
-                    gpu_status.memory_total = float(value.strip(" MiB"))
-                elif "memory.used" in key:
-                    gpu_mem_used = float(value.strip(" MiB"))
-                elif "memory.free" in key:
-                    gpu_status.memory_free = float(value.strip(" MiB"))
-            # compute used memory percentage
-            # value returned by utilization.memory is not accurate
-            gpu_status.memory_usage = round(gpu_mem_used / gpu_status.memory_total, 5)
-            gpu_status_list.append(gpu_status)
-        # close file
-        csvfile.close()
+    lines = output.split("\n")
+    if len(lines) <= 1:
+        return []
+    for row in lines[1:]:
+        gpu_status = GPUStatus()
+        row = row.split(",")
+        if len(row) != 7:
+            continue
+        gpu_status.index = row[0].strip()
+        gpu_status.gpu_name = row[1].strip()
+        gpu_status.gpu_usage = float(row[2].strip("% ")) / 100
+        gpu_status.temperature = float(row[3].strip())
+        gpu_status.memory_total = float(row[4].strip(" MiB"))
+        gpu_mem_used = float(row[5].strip(" MiB"))
+        gpu_status.memory_free = float(row[6].strip(" MiB"))
+        # compute used memory percentage
+        # value returned by utilization.memory is not accurate
+        gpu_status.memory_usage = round(gpu_mem_used / gpu_status.memory_total, 5)
+        gpu_status_list.append(gpu_status)
 
     return gpu_status_list
 
@@ -347,12 +332,24 @@ def get_status() -> MachineStatus:
 ## Main
 
 
-def main():
+def report_to_server(status: MachineStatus) -> bool:
+    status: dict = dict(status.dict())
+    data: str = json.dumps(status, default=json_serial)
+    r = requests.post(POST_URL, data=data, headers=HEADERS)
+    if r.status_code != 201:
+        logger.error(f"status_code: {r.status_code}")
+        return False
+    else:
+        return True
+
+
+def main(debug_mode: bool = False) -> None:
     retry = 0
 
     while True:
         sleep(INTERVAL)
         sleep(retry)
+
         try:
             if not is_connected():
                 logger.warning("Not Connected to Internet.")
@@ -360,21 +357,21 @@ def main():
                 continue
 
             status: MachineStatus = get_status()
-            status: dict = dict(status.dict())
-            data: str = json.dumps(status, default=json_serial)
+            if debug_mode:
+                logger.info(status)
+                continue
 
-            r = requests.post(POST_URL, data=data, headers=HEADERS)
-            if r.status_code != 201:
-                logger.error(f"status_code: {r.status_code}")
-                print(r.text)
-                print(r)
-            else:
-                print("201 OK")
+            successful = report_to_server(status)
+            if successful:
                 retry = 0
+                print("201 OK")
+            else:
+                retry += 5
+
         except Exception as e:
             logger.error(e)
             retry += 5
 
 
 if __name__ == "__main__":
-    main()
+    main(debug_mode=False)
